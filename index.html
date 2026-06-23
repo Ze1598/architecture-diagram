@@ -18,6 +18,7 @@
           <hr>
           <button data-action="save">Save <span class="kbd">Ctrl+S</span></button>
           <button data-action="save-as">Save As… <span class="kbd">Ctrl+Shift+S</span></button>
+          <button data-action="choose-folder" id="btn-choose-folder">Set Diagrams Folder…</button>
           <hr>
           <div id="recent-files-container">
             <span class="menu-label">Recent Files</span>
@@ -119,7 +120,7 @@
       <div id="palette-content"></div>
     </div>
     <!-- Hidden file input for custom shape upload -->
-    <input type="file" id="palette-upload-input" accept=".svg,.png,.jpg,.jpeg,.webp" multiple style="display:none">
+    <input type="file" id="palette-upload-input" accept=".svg,.png,.jpg,.jpeg,.webp,.zip" multiple style="display:none">
     <div id="canvas-wrap">
       <div id="paper-container"></div>
     </div>
@@ -157,12 +158,12 @@
           </div>
           <div class="prop-row">
             <label>Style</label>
-            <select id="prop-stroke-style">
-              <option value="">Solid</option>
-              <option value="4 4">Dashed</option>
-              <option value="1 4">Dotted</option>
-              <option value="8 4 2 4">Dash-dot</option>
-            </select>
+            <div class="vis-select" id="prop-stroke-style">
+              <button class="vis-opt" data-value="" title="Solid"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="1.5"/></svg></button>
+              <button class="vis-opt" data-value="4 4" title="Dashed"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 3"/></svg></button>
+              <button class="vis-opt" data-value="1 4" title="Dotted"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/></svg></button>
+              <button class="vis-opt" data-value="8 4 2 4" title="Dash-dot"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="8 3 2 3"/></svg></button>
+            </div>
           </div>
         </div>
 
@@ -206,43 +207,43 @@
         </div>
         <div class="prop-row">
           <label>Style</label>
-          <select id="prop-link-style">
-            <option value="">Solid</option>
-            <option value="4 4">Dashed</option>
-            <option value="1 4">Dotted</option>
-          </select>
+          <div class="vis-select" id="prop-link-style">
+            <button class="vis-opt" data-value="" title="Solid"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="1.5"/></svg></button>
+            <button class="vis-opt" data-value="4 4" title="Dashed"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 3"/></svg></button>
+            <button class="vis-opt" data-value="1 4" title="Dotted"><svg viewBox="0 0 40 14"><line x1="3" y1="7" x2="37" y2="7" stroke="currentColor" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/></svg></button>
+          </div>
         </div>
 
         <div class="prop-section-title">Arrows</div>
         <div class="prop-row">
           <label>Source</label>
-          <select id="prop-source-arrow">
-            <option value="none">None</option>
-            <option value="arrow">Filled</option>
-            <option value="openArrow">Open</option>
-            <option value="diamond">Diamond</option>
-            <option value="circle">Circle</option>
-          </select>
+          <div class="vis-select" id="prop-source-arrow">
+            <button class="vis-opt" data-value="none" title="None"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="30" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="30" y1="4" x2="30" y2="10" stroke="currentColor" stroke-width="1.5"/></svg></button>
+            <button class="vis-opt" data-value="arrow" title="Filled"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="24" y2="7" stroke="currentColor" stroke-width="1.5"/><polygon points="24,3 34,7 24,11" fill="currentColor"/></svg></button>
+            <button class="vis-opt" data-value="openArrow" title="Open"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="24" y2="7" stroke="currentColor" stroke-width="1.5"/><polyline points="24,3 34,7 24,11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter"/></svg></button>
+            <button class="vis-opt" data-value="diamond" title="Diamond"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1.5"/><polygon points="11,7 20,3 29,7 20,11" fill="currentColor"/></svg></button>
+            <button class="vis-opt" data-value="circle" title="Circle"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="26" y2="7" stroke="currentColor" stroke-width="1.5"/><circle cx="30" cy="7" r="4" fill="currentColor"/></svg></button>
+          </div>
         </div>
         <div class="prop-row">
           <label>Target</label>
-          <select id="prop-target-arrow">
-            <option value="none">None</option>
-            <option value="arrow">Filled</option>
-            <option value="openArrow">Open</option>
-            <option value="diamond">Diamond</option>
-            <option value="circle">Circle</option>
-          </select>
+          <div class="vis-select" id="prop-target-arrow">
+            <button class="vis-opt" data-value="none" title="None"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="30" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="30" y1="4" x2="30" y2="10" stroke="currentColor" stroke-width="1.5"/></svg></button>
+            <button class="vis-opt" data-value="arrow" title="Filled"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="24" y2="7" stroke="currentColor" stroke-width="1.5"/><polygon points="24,3 34,7 24,11" fill="currentColor"/></svg></button>
+            <button class="vis-opt" data-value="openArrow" title="Open"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="24" y2="7" stroke="currentColor" stroke-width="1.5"/><polyline points="24,3 34,7 24,11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter"/></svg></button>
+            <button class="vis-opt" data-value="diamond" title="Diamond"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1.5"/><polygon points="11,7 20,3 29,7 20,11" fill="currentColor"/></svg></button>
+            <button class="vis-opt" data-value="circle" title="Circle"><svg viewBox="0 0 36 14"><line x1="2" y1="7" x2="26" y2="7" stroke="currentColor" stroke-width="1.5"/><circle cx="30" cy="7" r="4" fill="currentColor"/></svg></button>
+          </div>
         </div>
 
         <div class="prop-section-title">Routing</div>
         <div class="prop-row">
           <label>Path</label>
-          <select id="prop-routing">
-            <option value="orthogonal">Orthogonal</option>
-            <option value="straight">Straight</option>
-            <option value="metro">Metro</option>
-          </select>
+          <div class="vis-select" id="prop-routing">
+            <button class="vis-opt" data-value="orthogonal" title="Orthogonal"><svg viewBox="0 0 48 22"><circle cx="6" cy="17" r="2.5" fill="currentColor"/><circle cx="42" cy="5" r="2.5" fill="currentColor"/><path d="M 6 17 L 24 17 L 24 5 L 42 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+            <button class="vis-opt" data-value="straight" title="Straight"><svg viewBox="0 0 48 22"><circle cx="6" cy="17" r="2.5" fill="currentColor"/><circle cx="42" cy="5" r="2.5" fill="currentColor"/><line x1="6" y1="17" x2="42" y2="5" stroke="currentColor" stroke-width="1.5"/></svg></button>
+            <button class="vis-opt" data-value="metro" title="Metro"><svg viewBox="0 0 48 22"><circle cx="6" cy="17" r="2.5" fill="currentColor"/><circle cx="42" cy="5" r="2.5" fill="currentColor"/><path d="M 6 17 C 24 17 24 5 42 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          </div>
         </div>
 
         <div class="prop-section-title">Label</div>
@@ -384,6 +385,7 @@
   <!-- Vendor -->
   <script src="vendor/joint.js"></script>
   <script src="vendor/dagre.js"></script>
+  <script src="vendor/jszip.js"></script>
 
   <!-- App modules (order matters — no ES modules) -->
   <script src="js/model.js"></script>

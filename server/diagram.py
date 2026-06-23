@@ -70,6 +70,80 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _esc(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _shape_svg(shape_type: str, x: float, y: float, w: float, h: float,
+               fill: str, stroke: str, sw: float) -> str:
+    cx, cy = x + w / 2, y + h / 2
+    base = f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}"'
+
+    if shape_type == "archd.RoundedRect":
+        return f'  <rect x="{x:.1f}" y="{y:.1f}" width="{w:.0f}" height="{h:.0f}" rx="8" {base}/>'
+
+    if shape_type == "archd.Ellipse":
+        return f'  <ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{w/2:.1f}" ry="{h/2:.1f}" {base}/>'
+
+    if shape_type == "archd.Diamond":
+        pts = f"{cx:.1f},{y:.1f} {x+w:.1f},{cy:.1f} {cx:.1f},{y+h:.1f} {x:.1f},{cy:.1f}"
+        return f'  <polygon points="{pts}" {base}/>'
+
+    if shape_type == "archd.Cylinder":
+        ry = h * 0.12
+        path = (f"M {x:.1f},{y+ry:.1f} Q {x:.1f},{y:.1f} {cx:.1f},{y:.1f} "
+                f"Q {x+w:.1f},{y:.1f} {x+w:.1f},{y+ry:.1f} "
+                f"L {x+w:.1f},{y+h-ry:.1f} "
+                f"Q {x+w:.1f},{y+h:.1f} {cx:.1f},{y+h:.1f} "
+                f"Q {x:.1f},{y+h:.1f} {x:.1f},{y+h-ry:.1f} Z")
+        cap = f'  <ellipse cx="{cx:.1f}" cy="{y+ry:.1f}" rx="{w/2:.1f}" ry="{ry:.1f}" {base}/>'
+        return f'  <path d="{path}" {base}/>\n{cap}'
+
+    if shape_type == "archd.Hexagon":
+        dx = w / 4
+        pts = (f"{x+dx:.1f},{y:.1f} {x+w-dx:.1f},{y:.1f} "
+               f"{x+w:.1f},{cy:.1f} {x+w-dx:.1f},{y+h:.1f} "
+               f"{x+dx:.1f},{y+h:.1f} {x:.1f},{cy:.1f}")
+        return f'  <polygon points="{pts}" {base}/>'
+
+    if shape_type == "archd.Parallelogram":
+        sk = w * 0.15
+        pts = (f"{x+sk:.1f},{y:.1f} {x+w:.1f},{y:.1f} "
+               f"{x+w-sk:.1f},{y+h:.1f} {x:.1f},{y+h:.1f}")
+        return f'  <polygon points="{pts}" {base}/>'
+
+    if shape_type == "archd.StickyNote":
+        cr = min(w, h) * 0.15
+        body = (f"{x:.1f},{y:.1f} {x+w-cr:.1f},{y:.1f} "
+                f"{x+w:.1f},{y+cr:.1f} {x+w:.1f},{y+h:.1f} {x:.1f},{y+h:.1f}")
+        fold = f"M {x+w-cr:.1f},{y:.1f} L {x+w-cr:.1f},{y+cr:.1f} L {x+w:.1f},{y+cr:.1f}"
+        return (f'  <polygon points="{body}" {base}/>\n'
+                f'  <path d="{fold}" fill="none" stroke="{stroke}" stroke-width="{sw}"/>')
+
+    if shape_type == "archd.Actor":
+        hr = w * 0.2
+        head_cy = y + hr
+        body_top = y + hr * 2.2
+        body_bot = y + h * 0.65
+        arm_y = body_top + (body_bot - body_top) * 0.3
+        return (f'  <circle cx="{cx:.1f}" cy="{head_cy:.1f}" r="{hr:.1f}" {base}/>\n'
+                f'  <line x1="{cx:.1f}" y1="{body_top:.1f}" x2="{cx:.1f}" y2="{body_bot:.1f}" '
+                f'stroke="{stroke}" stroke-width="{sw}"/>\n'
+                f'  <line x1="{x:.1f}" y1="{arm_y:.1f}" x2="{x+w:.1f}" y2="{arm_y:.1f}" '
+                f'stroke="{stroke}" stroke-width="{sw}"/>\n'
+                f'  <line x1="{cx:.1f}" y1="{body_bot:.1f}" x2="{x:.1f}" y2="{y+h:.1f}" '
+                f'stroke="{stroke}" stroke-width="{sw}"/>\n'
+                f'  <line x1="{cx:.1f}" y1="{body_bot:.1f}" x2="{x+w:.1f}" y2="{y+h:.1f}" '
+                f'stroke="{stroke}" stroke-width="{sw}"/>')
+
+    if shape_type == "archd.Cloud":
+        return f'  <rect x="{x:.1f}" y="{y:.1f}" width="{w:.0f}" height="{h:.0f}" rx="{h/2:.1f}" {base}/>'
+
+    # fallback: rect (Rectangle, TextLabel, ImageShape, etc.)
+    return f'  <rect x="{x:.1f}" y="{y:.1f}" width="{w:.0f}" height="{h:.0f}" {base}/>'
+
+
 class DiagramModel:
     def __init__(self, name: str = "Untitled") -> None:
         self.name = name
@@ -362,3 +436,94 @@ class DiagramModel:
                 lines.append(f"  {src} {arrow} {tgt}")
 
         return "\n".join(lines)
+
+    # ---- SVG export ----
+
+    def to_svg(self) -> str:
+        """Return a basic SVG string: correct shapes, positions, labels, edges."""
+        els  = [e for e in self.elements() if e["type"] != "archd.ImageShape"]
+        lnks = self.links()
+
+        pad = 40
+        if els:
+            xs = [e["position"]["x"] for e in els]
+            ys = [e["position"]["y"] for e in els]
+            xe = [e["position"]["x"] + e["size"]["width"] for e in els]
+            ye = [e["position"]["y"] + e["size"]["height"] for e in els]
+            ox = pad - min(xs)
+            oy = pad - min(ys)
+            svg_w = max(xe) - min(xs) + pad * 2
+            svg_h = max(ye) - min(ys) + pad * 2
+        else:
+            ox, oy, svg_w, svg_h = pad, pad, 200, 100
+
+        parts: List[str] = [
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w:.0f}" height="{svg_h:.0f}" '
+            f'viewBox="0 0 {svg_w:.0f} {svg_h:.0f}">',
+            "<defs>",
+            '  <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">',
+            '    <path d="M0,0 L0,6 L7,3 z" fill="#333"/>',
+            "  </marker>",
+            "</defs>",
+        ]
+
+        for el in els:
+            ex = el["position"]["x"] + ox
+            ey = el["position"]["y"] + oy
+            ew = el["size"]["width"]
+            eh = el["size"]["height"]
+            body      = el.get("attrs", {}).get("body", {})
+            lbl_attrs = el.get("attrs", {}).get("label", {})
+            fill      = body.get("fill", "#ffffff")
+            stroke    = body.get("stroke", "#333333")
+            sw        = body.get("strokeWidth", 1.5)
+            label     = lbl_attrs.get("text", "")
+            lbl_fill  = lbl_attrs.get("fill", "#333333")
+            font_size = lbl_attrs.get("fontSize", 13)
+
+            parts.append(_shape_svg(el["type"], ex, ey, ew, eh, fill, stroke, sw))
+            if label:
+                lcx = ex + ew / 2
+                lcy = ey + eh / 2 + font_size * 0.35
+                parts.append(
+                    f'  <text x="{lcx:.1f}" y="{lcy:.1f}" text-anchor="middle" '
+                    f'font-family="system-ui,sans-serif" font-size="{font_size}" fill="{lbl_fill}">'
+                    f"{_esc(label)}</text>"
+                )
+
+        el_map = {e["id"]: e for e in els}
+        for lnk in lnks:
+            src_el = el_map.get(lnk.get("source", {}).get("id", ""))
+            tgt_el = el_map.get(lnk.get("target", {}).get("id", ""))
+            if not src_el or not tgt_el:
+                continue
+
+            sx = src_el["position"]["x"] + ox + src_el["size"]["width"] / 2
+            sy = src_el["position"]["y"] + oy + src_el["size"]["height"] / 2
+            tx = tgt_el["position"]["x"] + ox + tgt_el["size"]["width"] / 2
+            ty = tgt_el["position"]["y"] + oy + tgt_el["size"]["height"] / 2
+
+            line_a   = lnk.get("attrs", {}).get("line", {})
+            s_color  = line_a.get("stroke", "#333333")
+            s_width  = line_a.get("strokeWidth", 1.5)
+            dash     = line_a.get("strokeDasharray", "").strip()
+            directed = bool(line_a.get("targetMarker", {}).get("d", ""))
+
+            dash_attr  = f' stroke-dasharray="{dash}"' if dash else ""
+            arrow_attr = ' marker-end="url(#arr)"' if directed else ""
+            parts.append(
+                f'  <line x1="{sx:.1f}" y1="{sy:.1f}" x2="{tx:.1f}" y2="{ty:.1f}" '
+                f'stroke="{s_color}" stroke-width="{s_width}"{dash_attr}{arrow_attr}/>'
+            )
+            if lnk.get("labels"):
+                lbl = lnk["labels"][0].get("attrs", {}).get("text", {}).get("text", "")
+                if lbl:
+                    mx, my = (sx + tx) / 2, (sy + ty) / 2 - 6
+                    parts.append(
+                        f'  <text x="{mx:.1f}" y="{my:.1f}" text-anchor="middle" '
+                        f'font-family="system-ui,sans-serif" font-size="11" fill="#333">'
+                        f"{_esc(lbl)}</text>"
+                    )
+
+        parts.append("</svg>")
+        return "\n".join(parts)

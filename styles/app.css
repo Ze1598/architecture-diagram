@@ -562,6 +562,49 @@ button.btn-secondary:hover { background: var(--bg); }
   min-width: 0;
 }
 
+/* Visual-select button groups (replaces plain <select> for icon-heavy options) */
+.vis-select {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vis-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--text-muted);
+  min-width: 0;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.vis-opt:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.vis-opt.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.vis-opt svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  overflow: visible;
+}
+
 .prop-value-label {
   font-size: 11px;
   color: var(--text-muted);

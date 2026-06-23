@@ -6,10 +6,15 @@ App.IO = (function () {
   const IDB_NAME = 'archdAutosave';
   const IDB_STORE = 'documents';
   const AUTOSAVE_DELAY = 30000;
+  const FOLDER_KEY = 'diagramsFolder';
+  const FOLDER_AUTOSAVE = '_autosave.archd';
 
   const hasFSA = typeof window.showSaveFilePicker === 'function';
+  const hasDirPicker = typeof window.showDirectoryPicker === 'function';
 
   let fileHandle = null;     // FileSystemFileHandle | null
+  let _dirHandle = null;     // FileSystemDirectoryHandle | null
+  let _folderHandleReady = null;
   let _idb = null;
   let _autosaveTimer = null;
   let _lastExplicitSaveAt = null;
@@ -48,6 +53,63 @@ App.IO = (function () {
     });
   }
 
+  // ---- Diagrams folder (FSA directory) ----
+
+  async function _loadFolderHandle() {
+    if (!hasDirPicker) return;
+    try {
+      const record = await _idbGet(FOLDER_KEY);
+      if (record && record.handle) _dirHandle = record.handle;
+    } catch (e) {
+      console.warn('Could not restore folder handle:', e);
+    }
+  }
+
+  async function _canReadDir() {
+    if (!_dirHandle) return false;
+    try {
+      return (await _dirHandle.queryPermission({ mode: 'read' })) === 'granted';
+    } catch { return false; }
+  }
+
+  async function _canWriteDir() {
+    if (!_dirHandle) return false;
+    try {
+      return (await _dirHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
+    } catch { return false; }
+  }
+
+  async function chooseDiagramsFolder() {
+    if (!hasDirPicker) {
+      alert('Directory picker is not supported in this browser. Use a Chromium-based browser.');
+      return;
+    }
+    try {
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      _dirHandle = handle;
+      await _idbPut({ id: FOLDER_KEY, handle });
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('chooseDiagramsFolder:', e);
+    }
+  }
+
+  async function _autosaveToDiagramsFolder(data) {
+    if (!await _canWriteDir()) return;
+    try {
+      const fh = await _dirHandle.getFileHandle(FOLDER_AUTOSAVE, { create: true });
+      const writable = await fh.createWritable();
+      await writable.write(data);
+      await writable.close();
+    } catch (e) {
+      console.warn('Folder autosave failed:', e);
+    }
+  }
+
+  async function _clearFolderAutosave() {
+    if (!await _canWriteDir()) return;
+    try { await _dirHandle.removeEntry(FOLDER_AUTOSAVE); } catch { /* already gone */ }
+  }
+
   // ---- Autosave ----
 
   function _scheduleAutosave() {
@@ -59,12 +121,38 @@ App.IO = (function () {
     try {
       const data = App.Model.serialize();
       await _idbPut({ id: 'current', data, savedAt: new Date().toISOString() });
+      await _autosaveToDiagramsFolder(data);
     } catch (e) {
       console.warn('Autosave failed:', e);
     }
   }
 
   async function checkAutosaveRecovery() {
+    await _folderHandleReady;
+
+    // Prefer folder autosave over IDB blob
+    if (await _canReadDir()) {
+      try {
+        const fh = await _dirHandle.getFileHandle(FOLDER_AUTOSAVE).catch(() => null);
+        if (fh) {
+          const file = await fh.getFile();
+          const ok = window.confirm(
+            'Unsaved changes found in diagrams folder (' +
+            new Date(file.lastModified).toLocaleString() + ').\n\nRestore them?'
+          );
+          if (ok) {
+            App.Model.deserialize(await file.text());
+            App.History.clear();
+            App.Events.emit('document:loaded', App.Model.current);
+          } else {
+            await _clearFolderAutosave();
+          }
+          return;
+        }
+      } catch (e) { /* fall through to IDB */ }
+    }
+
+    // IDB fallback
     try {
       const record = await _idbGet('current');
       if (!record) return;
@@ -144,6 +232,7 @@ App.IO = (function () {
     App.Model.newDocument('Untitled');
     App.History.clear();
     _clearAutosave();
+    _clearFolderAutosave();
     App.Events.emit('document:new');
   }
 
@@ -220,6 +309,7 @@ App.IO = (function () {
       App.Model.markClean();
       _addRecentFile(file.name);
       await _clearAutosave();
+      await _clearFolderAutosave();
     } catch (e) {
       alert('Save failed: ' + e.message);
     }
@@ -240,9 +330,13 @@ App.IO = (function () {
     _lastExplicitSaveAt = new Date().toISOString();
     App.Model.markClean();
     _addRecentFile(a.download);
+    _clearFolderAutosave();
   }
 
   function init() {
+    // Start loading the persisted folder handle (async, awaited in checkAutosaveRecovery)
+    _folderHandleReady = _loadFolderHandle();
+
     // Wire graph changes to autosave schedule
     App.Canvas.graph.on('change add remove', _scheduleAutosave);
 
@@ -263,12 +357,15 @@ App.IO = (function () {
   return {
     get fileHandle() { return fileHandle; },
     get hasFSA() { return hasFSA; },
+    get hasDirPicker() { return hasDirPicker; },
+    get dirHandle() { return _dirHandle; },
     init,
     newFile,
     openFile,
     saveFile,
     saveFileAs,
     checkAutosaveRecovery,
+    chooseDiagramsFolder,
     getRecentFiles
   };
 })();

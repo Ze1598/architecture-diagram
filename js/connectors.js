@@ -38,7 +38,7 @@ App.Connectors = (function () {
 
   function setArrowhead(link, end, styleName) {
     const style = ARROWHEAD_STYLES[styleName] || ARROWHEAD_STYLES.none;
-    const attrPath = end === 'source' ? 'attrs/line/sourceMarker' : 'attrs/line/targetMarker';
+    const attrPath = end === 'source' ? 'line/sourceMarker' : 'line/targetMarker';
     link.attr(attrPath, style);
   }
 

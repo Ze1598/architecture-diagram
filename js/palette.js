@@ -201,9 +201,14 @@ App.Palette = (function () {
   }
 
   async function _processUpload(file) {
+    if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
+      await _processZipUpload(file);
+      return;
+    }
+
     const allowed = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
     if (!allowed.includes(file.type)) {
-      alert('Unsupported file type: ' + file.type + '\nPlease upload SVG, PNG, JPEG, or WebP.');
+      alert('Unsupported file type: ' + file.type + '\nPlease upload SVG, PNG, JPEG, WebP, or ZIP.');
       return;
     }
 
@@ -216,6 +221,69 @@ App.Palette = (function () {
 
     const name = file.name.replace(/\.[^.]+$/, '');
     await App.CustomLibrary.add({ name, dataUrl, mimeType: file.type });
+  }
+
+  async function _processZipUpload(file) {
+    const bridgeUrl = _getBridgeUrl();
+    if (!bridgeUrl) {
+      alert('ZIP upload requires the HTTP bridge to be connected.\n\nConnect the bridge via the Bridge button in the toolbar, then retry.');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const res = await fetch(bridgeUrl + '/shapes/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        alert('ZIP upload failed: ' + res.status + (text ? '\n' + text : ''));
+        return;
+      }
+      const result = await res.json();
+      const count = result.accepted || 0;
+      if (count === 0) {
+        alert('ZIP contained no supported image files (SVG, PNG, JPEG).');
+      } else {
+        await _reloadBridgeShapes(bridgeUrl);
+      }
+    } catch (e) {
+      alert('ZIP upload error: ' + e.message);
+    }
+  }
+
+  async function _reloadBridgeShapes(bridgeUrl) {
+    try {
+      const res = await fetch(bridgeUrl + '/shapes', { cache: 'no-store' });
+      if (!res.ok) return;
+      const shapes = await res.json();
+      for (const shape of shapes) {
+        const imgRes = await fetch(bridgeUrl + '/shapes/' + encodeURIComponent(shape.filename), { cache: 'no-store' });
+        if (!imgRes.ok) continue;
+        const blob = await imgRes.blob();
+        const dataUrl = await new Promise(resolve => {
+          const r = new FileReader();
+          r.onload = e => resolve(e.target.result);
+          r.readAsDataURL(blob);
+        });
+        const name = shape.filename.replace(/\.[^.]+$/, '');
+        const existing = App.CustomLibrary.getCache().find(e => e.name === name);
+        if (!existing) {
+          await App.CustomLibrary.add({ name, dataUrl, mimeType: blob.type });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not reload bridge shapes:', e);
+    }
+  }
+
+  function _getBridgeUrl() {
+    const urlInput = document.getElementById('bridge-url');
+    const dot = document.getElementById('bridge-dot');
+    if (!dot || !dot.classList.contains('bridge-dot-on')) return null;
+    return urlInput ? (urlInput.value || '').trim().replace(/\/$/, '') : null;
   }
 
   // ---- Canvas drop ----

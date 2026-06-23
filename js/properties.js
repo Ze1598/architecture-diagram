@@ -22,9 +22,29 @@ App.Properties = (function () {
     if (el && val !== undefined && val !== null) el.value = String(val);
   }
 
+  function _vv(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.querySelectorAll('.vis-opt').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.value === String(val));
+    });
+  }
+
   function _on(id, evt, fn) {
     const el = document.getElementById(id);
     if (el) el.addEventListener(evt, fn);
+  }
+
+  function _onVis(id, fn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', (e) => {
+      const btn = e.target.closest('.vis-opt');
+      if (!btn) return;
+      el.querySelectorAll('.vis-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      fn(btn.dataset.value);
+    });
   }
 
   // ---- Fill UI from model ----
@@ -48,7 +68,7 @@ App.Properties = (function () {
 
       _v('prop-stroke-color', _toHex(stroke));
       _v('prop-stroke-width', strokeW !== undefined ? strokeW : 1.5);
-      _v('prop-stroke-style', dash);
+      _vv('prop-stroke-style', dash);
 
       const op = opacity !== undefined ? opacity : 1;
       _v('prop-opacity', op);
@@ -71,13 +91,13 @@ App.Properties = (function () {
   function _fillLinkUI(link) {
     _v('prop-link-color', _toHex(link.attr('line/stroke') || '#333333'));
     _v('prop-link-width', link.attr('line/strokeWidth') || 1.5);
-    _v('prop-link-style', link.attr('line/strokeDasharray') || '');
+    _vv('prop-link-style', link.attr('line/strokeDasharray') || '');
 
-    _v('prop-source-arrow', _identifyArrow(link.attr('line/sourceMarker')));
-    _v('prop-target-arrow', _identifyArrow(link.attr('line/targetMarker')));
+    _vv('prop-source-arrow', _identifyArrow(link.attr('line/sourceMarker')));
+    _vv('prop-target-arrow', _identifyArrow(link.attr('line/targetMarker')));
 
     const router = link.get('router') || {};
-    _v('prop-routing', router.name || 'orthogonal');
+    _vv('prop-routing', router.name || 'orthogonal');
 
     const labels = link.labels() || [];
     const firstLabel = labels[0];
@@ -184,8 +204,7 @@ App.Properties = (function () {
     _on('prop-stroke-width', 'change', _commitLive);
 
     // === Element: Stroke style ===
-    _on('prop-stroke-style', 'change', () => _instant(() => {
-      const dash = document.getElementById('prop-stroke-style').value;
+    _onVis('prop-stroke-style', (dash) => _instant(() => {
       _els().forEach(el => { const s = _bodySelector(el); if (s) el.attr(s + '/strokeDasharray', dash); });
     }));
 
@@ -237,26 +256,22 @@ App.Properties = (function () {
     _on('prop-link-width', 'change', _commitLive);
 
     // === Link: Style ===
-    _on('prop-link-style', 'change', () => _instant(() => {
-      const dash = document.getElementById('prop-link-style').value;
+    _onVis('prop-link-style', (dash) => _instant(() => {
       _links().forEach(l => l.attr('line/strokeDasharray', dash));
     }));
 
     // === Link: Source arrowhead ===
-    _on('prop-source-arrow', 'change', () => _instant(() => {
-      const style = document.getElementById('prop-source-arrow').value;
+    _onVis('prop-source-arrow', (style) => _instant(() => {
       _links().forEach(l => App.Connectors.setArrowhead(l, 'source', style));
     }));
 
     // === Link: Target arrowhead ===
-    _on('prop-target-arrow', 'change', () => _instant(() => {
-      const style = document.getElementById('prop-target-arrow').value;
+    _onVis('prop-target-arrow', (style) => _instant(() => {
       _links().forEach(l => App.Connectors.setArrowhead(l, 'target', style));
     }));
 
     // === Link: Routing ===
-    _on('prop-routing', 'change', () => _instant(() => {
-      const name = document.getElementById('prop-routing').value;
+    _onVis('prop-routing', (name) => _instant(() => {
       _links().forEach(l => App.Connectors.setRouter(l, name));
     }));
 

@@ -134,6 +134,30 @@ App.Interactions = (function () {
     elementView.removeTools();
   }
 
+  const _endpointHandle = {
+    'd': 'M -6 0 A 6 6 0 1 0 6 0 A 6 6 0 1 0 -6 0 Z',
+    'fill': '#4a7cf6',
+    'stroke': '#ffffff',
+    'stroke-width': 1.5,
+    'cursor': 'move',
+    'class': ''
+  };
+  const _SourceHandle = joint.linkTools.SourceArrowhead.extend({ attributes: _endpointHandle });
+  const _TargetHandle = joint.linkTools.TargetArrowhead.extend({ attributes: _endpointHandle });
+
+  function _showLinkTools(linkView) {
+    const tools = new joint.dia.ToolsView({
+      tools: [
+        new _SourceHandle(),
+        new _TargetHandle(),
+        new joint.linkTools.Vertices({ redundancyRemoval: true }),
+        new joint.linkTools.Segments(),
+        new joint.linkTools.Remove({ distance: 20 }),
+      ]
+    });
+    linkView.addTools(tools);
+  }
+
   function selectCell(cell, addToSelection) {
     if (!addToSelection) clearSelection();
     if (!cell) return;
@@ -146,6 +170,7 @@ App.Interactions = (function () {
     if (view) {
       _highlightCell(view);
       if (cell.isElement()) _showTools(view);
+      else if (cell.isLink()) _showLinkTools(view);
     }
 
     App.Events.emit('selection:changed', getSelectedCells());
@@ -159,7 +184,7 @@ App.Interactions = (function () {
     const view = App.Canvas.paper.findViewByModel(cell);
     if (view) {
       _unhighlightCell(view);
-      if (cell.isElement()) _hideTools(view);
+      view.removeTools();
     }
 
     App.Events.emit('selection:changed', getSelectedCells());
@@ -172,7 +197,7 @@ App.Interactions = (function () {
         const view = App.Canvas.paper.findViewByModel(cell);
         if (view) {
           _unhighlightCell(view);
-          if (cell.isElement()) _hideTools(view);
+          view.removeTools();
         }
       }
     });
@@ -297,16 +322,14 @@ App.Interactions = (function () {
     if (labelEditor) _commitLabelEdit();
     editingCell = elementView.model;
 
-    const bbox = elementView.getBBox({ useModelGeometry: false });
-    const wrap = document.getElementById('canvas-wrap');
+    const wrap    = document.getElementById('canvas-wrap');
     const wrapRect = wrap.getBoundingClientRect();
-    const paperEl = App.Canvas.paper.el;
-    const paperRect = paperEl.getBoundingClientRect();
+    const elRect   = elementView.el.getBoundingClientRect();
 
-    const left   = paperRect.left - wrapRect.left + bbox.x * App.Canvas.getZoom() + App.Canvas.paper.translate().tx;
-    const top    = paperRect.top  - wrapRect.top  + bbox.y * App.Canvas.getZoom() + App.Canvas.paper.translate().ty;
-    const width  = Math.max(60, bbox.width  * App.Canvas.getZoom());
-    const height = Math.max(24, bbox.height * App.Canvas.getZoom());
+    const left   = elRect.left - wrapRect.left;
+    const top    = elRect.top  - wrapRect.top;
+    const width  = Math.max(60, elRect.width);
+    const height = Math.max(24, elRect.height);
 
     labelEditor = document.createElement('textarea');
     labelEditor.id = 'label-editor';
@@ -354,19 +377,30 @@ App.Interactions = (function () {
     marqueeEl.id = 'marquee';
     document.getElementById('canvas-wrap').appendChild(marqueeEl);
 
-    App.Canvas.paper.on('blank:pointerdown', (evt, x, y) => {
-      if (App.Canvas.isPanning) return;
-      if (evt.shiftKey) return;
-      clearSelection();
-      marqueeActive = true;
-      const wrap = document.getElementById('canvas-wrap');
-      const rect = wrap.getBoundingClientRect();
-      marqueeStart = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
-      marqueeEl.style.left   = marqueeStart.x + 'px';
-      marqueeEl.style.top    = marqueeStart.y + 'px';
-      marqueeEl.style.width  = '0px';
-      marqueeEl.style.height = '0px';
-      marqueeEl.style.display = 'block';
+    let _blankDownPos = null;
+
+    App.Canvas.paper.on('blank:pointerdown', (evt) => {
+      _blankDownPos = { x: evt.clientX, y: evt.clientY };
+
+      // Alt+drag → marquee
+      if (evt.altKey) {
+        marqueeActive = true;
+        const wrap = document.getElementById('canvas-wrap');
+        const rect = wrap.getBoundingClientRect();
+        marqueeStart = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+        marqueeEl.style.left   = marqueeStart.x + 'px';
+        marqueeEl.style.top    = marqueeStart.y + 'px';
+        marqueeEl.style.width  = '0px';
+        marqueeEl.style.height = '0px';
+        marqueeEl.style.display = 'block';
+      }
+    });
+
+    App.Canvas.paper.on('blank:pointerup', (evt) => {
+      if (!_blankDownPos) return;
+      const moved = Math.hypot(evt.clientX - _blankDownPos.x, evt.clientY - _blankDownPos.y);
+      if (moved < 5 && !evt.shiftKey) clearSelection();
+      _blankDownPos = null;
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -415,12 +449,12 @@ App.Interactions = (function () {
   function init() {
     const paper = App.Canvas.paper;
 
-    // Element click — select
+    // Element click — select (Shift or Ctrl = add/remove from selection)
     paper.on('element:pointerdown', (elementView, evt) => {
       if (evt.button !== 0) return;
       if (App.Canvas.isPanning) return;
       const cell = elementView.model;
-      if (evt.shiftKey) {
+      if (evt.shiftKey || evt.ctrlKey || evt.metaKey) {
         if (selectedIds.has(cell.id)) deselectCell(cell);
         else selectCell(cell, true);
       } else {
@@ -428,21 +462,17 @@ App.Interactions = (function () {
       }
     });
 
-    // Link click
+    // Link click (Shift or Ctrl = add/remove; only select if not already selected to avoid
+    // tearing out tools mid-drag when the user interacts with SourceArrowhead/TargetArrowhead)
     paper.on('link:pointerdown', (linkView, evt) => {
       if (evt.button !== 0) return;
       const cell = linkView.model;
-      if (evt.shiftKey) {
+      if (evt.shiftKey || evt.ctrlKey || evt.metaKey) {
         if (selectedIds.has(cell.id)) deselectCell(cell);
         else selectCell(cell, true);
       } else {
-        selectCell(cell, false);
+        if (!selectedIds.has(cell.id)) selectCell(cell, false);
       }
-    });
-
-    // Blank click — clear selection
-    paper.on('blank:pointerdown', (evt) => {
-      if (!evt.shiftKey && !App.Canvas.isPanning) clearSelection();
     });
 
     // Double-click to edit label

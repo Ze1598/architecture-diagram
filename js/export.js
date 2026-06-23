@@ -15,7 +15,7 @@ App.Export = (function () {
   // ---- SVG export ----
 
   function exportSVG() {
-    const svgStr = _buildSVGString();
+    const svgStr = _buildSVGString(false);
     if (!svgStr) return;
     const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
     _triggerDownload(blob, _filename('svg'));
@@ -23,7 +23,7 @@ App.Export = (function () {
 
   function exportPNG(scale, transparentBg) {
     scale = scale || 2;
-    const svgStr = _buildSVGString();
+    const svgStr = _buildSVGString(transparentBg);
     if (!svgStr) return;
 
     const img = new Image();
@@ -54,7 +54,7 @@ App.Export = (function () {
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
   }
 
-  function _buildSVGString() {
+  function _buildSVGString(transparent) {
     const paper = App.Canvas.paper;
     const graph = App.Canvas.graph;
 
@@ -96,6 +96,17 @@ App.Export = (function () {
     // so the SVG renders correctly as a standalone file.
     clone.removeAttribute('style');
     clone.style.overflow = 'visible';
+
+    // Strip UI-only elements that don't belong in any export
+    clone.querySelectorAll('.joint-port').forEach(el => el.remove());
+    const gridLayer = clone.querySelector('.joint-grid-layer');
+    if (gridLayer) gridLayer.remove();
+
+    // For transparent exports, also remove the paper background rect
+    if (transparent) {
+      const bg = clone.querySelector('.joint-paper-background');
+      if (bg) bg.remove();
+    }
 
     // Embed a minimal inline style so shapes look correct without app.css
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');

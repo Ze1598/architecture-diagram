@@ -72,6 +72,7 @@
       case 'open':          App.IO.openFile();   break;
       case 'save':          App.IO.saveFile();   break;
       case 'save-as':       App.IO.saveFileAs(); break;
+      case 'choose-folder': App.IO.chooseDiagramsFolder(); break;
       case 'undo':          App.History.undo();  break;
       case 'redo':          App.History.redo();  break;
       case 'delete':        App.Interactions.deleteSelected(); break;

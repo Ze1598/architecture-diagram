@@ -11,6 +11,7 @@ App.Canvas = (function () {
   let panStart = null;
   let panOrigin = null;
   let spaceDown = false;
+  let _blankDown = false;
   let _preInteractionSnapshot = null;
 
   function init() {
@@ -57,12 +58,23 @@ App.Canvas = (function () {
       zoomAroundPoint(currentScale + delta, cx, cy);
     }, { passive: false });
 
-    // Pan via middle mouse or space+drag
+    // Track blank vs cell clicks so we know when left-drag should pan
+    paper.on('blank:pointerdown', () => { _blankDown = true; });
+    paper.on('element:pointerdown link:pointerdown', () => { _blankDown = false; });
+
+    // Pan: middle-mouse, space+drag (alias), or plain left-drag on blank canvas
     wrap.addEventListener('mousedown', (e) => {
       if (e.button === 1 || (e.button === 0 && spaceDown)) {
         e.preventDefault();
+        _blankDown = false;
+        _startPan(e);
+        return;
+      }
+      if (e.button === 0 && _blankDown && !e.altKey) {
+        e.preventDefault();
         _startPan(e);
       }
+      _blankDown = false;
     });
 
     wrap.addEventListener('mousemove', (e) => {
@@ -178,8 +190,26 @@ App.Canvas = (function () {
 
   function fitToContent() {
     if (graph.getCells().length === 0) return;
-    paper.scaleContentToFit({ padding: 60, minScale: MIN_SCALE, maxScale: MAX_SCALE });
-    currentScale = paper.scale().sx;
+    const contentArea = paper.getContentArea({ useModelGeometry: true });
+    if (!contentArea || contentArea.width === 0 || contentArea.height === 0) return;
+
+    const wrap = document.getElementById('canvas-wrap');
+    const viewW = wrap.clientWidth;
+    const viewH = wrap.clientHeight;
+    const pad   = 60;
+
+    const scaleX = (viewW - pad * 2) / contentArea.width;
+    const scaleY = (viewH - pad * 2) / contentArea.height;
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.min(scaleX, scaleY)));
+
+    const scaledW = contentArea.width  * newScale;
+    const scaledH = contentArea.height * newScale;
+    const tx = (viewW - scaledW) / 2 - contentArea.x * newScale;
+    const ty = (viewH - scaledH) / 2 - contentArea.y * newScale;
+
+    currentScale = newScale;
+    paper.scale(newScale, newScale);
+    paper.translate(tx, ty);
     _emitZoom();
   }
 

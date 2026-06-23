@@ -26,17 +26,21 @@ Run both at once (HTTP in background thread):
 from __future__ import annotations
 
 import argparse
+import base64
+import io
 import json
 import threading
+import zipfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # ---- FastMCP (MCP Python SDK >= 1.0) ----
 from mcp.server.fastmcp import FastMCP
 
 # ---- FastAPI (HTTP bridge) ----
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -223,16 +227,108 @@ def apply_layout(path: str, direction: str = "TB") -> Dict[str, Any]:
 
 
 @mcp.tool()
-def export_diagram(path: str, format: str = "mermaid") -> Dict[str, Any]:
-    """Export the diagram topology.
+def set_diagram(
+    path: str,
+    nodes: list,
+    edges: list,
+    auto_layout: Optional[str] = "TB",
+) -> Dict[str, Any]:
+    """Replace a diagram's content atomically with a full node+edge spec.
 
-    Currently supports format='mermaid' (lossy: preserves topology and labels only).
-    Returns the Mermaid source as a string.
+    Clears the existing diagram, inserts all nodes and edges, optionally
+    runs auto-layout, then saves.  Ideal for bulk one-shot diagram creation.
+
+    Each node: {"id": str, "label": str, "shape"?: str, "x"?: float, "y"?: float,
+                 "fill"?: str, "stroke"?: str}
+    Each edge: {"source_id": str, "target_id": str, "label"?: str,
+                 "directed"?: bool, "dashed"?: bool}
+    auto_layout: "TB" | "LR" | "BT" | "RL" | null (skip layout)
     """
-    if format != "mermaid":
-        raise ValueError("Only 'mermaid' export is currently supported")
+    global _current_path
+    _work_dir.mkdir(parents=True, exist_ok=True)
+    model_name = Path(path).stem.replace("_", " ")
+    model = DiagramModel(model_name)
+    _diagrams[path] = model
+
+    id_map: Dict[str, str] = {}
+    for node_spec in nodes:
+        caller_id = node_spec.get("id", "")
+        shape_alias = node_spec.get("shape", "rectangle")
+        node_type = SHAPE_NAME_MAP.get(shape_alias, "archd.Rectangle")
+        real_id = model.add_node(
+            node_type=node_type,
+            label=node_spec.get("label", ""),
+            x=node_spec.get("x"),
+            y=node_spec.get("y"),
+            fill=node_spec.get("fill"),
+            stroke=node_spec.get("stroke"),
+        )
+        if caller_id:
+            id_map[caller_id] = real_id
+
+    for edge_spec in edges:
+        src = id_map.get(edge_spec["source_id"], edge_spec["source_id"])
+        tgt = id_map.get(edge_spec["target_id"], edge_spec["target_id"])
+        model.add_edge(
+            src, tgt,
+            label=edge_spec.get("label", ""),
+            directed=edge_spec.get("directed", True),
+            dashed=edge_spec.get("dashed", False),
+        )
+
+    if auto_layout and auto_layout in ("TB", "BT", "LR", "RL"):
+        model.apply_layout(direction=auto_layout)
+
+    _save(path)
+    return {
+        "path": path,
+        "nodes": len(nodes),
+        "edges": len(edges),
+        "layout": auto_layout or "none",
+        "id_map": id_map,
+    }
+
+
+@mcp.tool()
+def export_diagram(path: str, format: str = "mermaid") -> Dict[str, Any]:
+    """Export the diagram topology as text content.
+
+    format='mermaid' — returns Mermaid source string (topology + labels).
+    format='svg'     — returns a basic SVG string (shapes, positions, edges,
+                        labels). Not pixel-perfect but topologically correct.
+    """
     model = _ensure(path)
-    return {"format": "mermaid", "content": model.to_mermaid()}
+    if format == "mermaid":
+        return {"format": "mermaid", "content": model.to_mermaid()}
+    if format == "svg":
+        return {"format": "svg", "content": model.to_svg()}
+    raise ValueError("Supported formats: 'mermaid', 'svg'")
+
+
+@mcp.tool()
+def list_custom_shapes() -> List[Dict[str, Any]]:
+    """List all custom shapes stored in server/shapes/.
+
+    Returns each shape's filename, MIME type, and a base64-encoded data URI
+    so the LLM can reference them in add_node calls.
+    """
+    shapes_dir = Path(__file__).parent / "shapes"
+    shapes_dir.mkdir(parents=True, exist_ok=True)
+    allowed_suffixes = {".svg", ".png", ".jpg", ".jpeg"}
+    result = []
+    for p in sorted(shapes_dir.iterdir()):
+        if p.suffix.lower() not in allowed_suffixes:
+            continue
+        data = p.read_bytes()
+        mime = {
+            ".svg":  "image/svg+xml",
+            ".png":  "image/png",
+            ".jpg":  "image/jpeg",
+            ".jpeg": "image/jpeg",
+        }.get(p.suffix.lower(), "application/octet-stream")
+        data_uri = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+        result.append({"filename": p.name, "mime": mime, "data_uri": data_uri})
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +432,66 @@ async def http_layout(rest_path: str, body: LayoutBody = LayoutBody()):
 async def http_delete(rest_path: str, element_id: str):
     path = "/" + rest_path
     return delete_element(path=path, element_id=element_id)
+
+
+# ---- Shapes endpoints ----
+
+_ALLOWED_SHAPE_SUFFIXES = {".svg", ".png", ".jpg", ".jpeg"}
+
+
+def _shapes_dirs():
+    server_shapes = Path(__file__).parent / "shapes"
+    project_shapes = Path(__file__).parent.parent / "custom_shapes"
+    server_shapes.mkdir(parents=True, exist_ok=True)
+    project_shapes.mkdir(parents=True, exist_ok=True)
+    return server_shapes, project_shapes
+
+
+@http_app.post("/shapes/upload")
+async def http_upload_shapes(file: UploadFile = File(...)):
+    """Accept a ZIP file, extract accepted image types, write to both shapes dirs."""
+    server_dir, project_dir = _shapes_dirs()
+    content = await file.read()
+    accepted: List[str] = []
+    skipped: List[str] = []
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            for name in zf.namelist():
+                p = Path(name)
+                if p.suffix.lower() not in _ALLOWED_SHAPE_SUFFIXES:
+                    skipped.append(name)
+                    continue
+                data = zf.read(name)
+                safe_name = p.name
+                (server_dir  / safe_name).write_bytes(data)
+                (project_dir / safe_name).write_bytes(data)
+                accepted.append(safe_name)
+    except zipfile.BadZipFile as e:
+        raise HTTPException(400, f"Invalid ZIP file: {e}")
+
+    return {"accepted": len(accepted), "files": accepted, "skipped": skipped}
+
+
+@http_app.get("/shapes")
+async def http_list_shapes():
+    server_dir, _ = _shapes_dirs()
+    shapes = []
+    for p in sorted(server_dir.iterdir()):
+        if p.suffix.lower() in _ALLOWED_SHAPE_SUFFIXES:
+            shapes.append({"filename": p.name, "size": p.stat().st_size})
+    return shapes
+
+
+@http_app.get("/shapes/{filename}")
+async def http_get_shape(filename: str):
+    server_dir, _ = _shapes_dirs()
+    p = server_dir / filename
+    if not p.exists() or p.suffix.lower() not in _ALLOWED_SHAPE_SUFFIXES:
+        raise HTTPException(404, f"Shape not found: {filename}")
+    mime_map = {".svg": "image/svg+xml", ".png": "image/png",
+                ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+    return FileResponse(str(p), media_type=mime_map.get(p.suffix.lower(), "application/octet-stream"))
 
 
 # ---------------------------------------------------------------------------
