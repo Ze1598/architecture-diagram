@@ -33,8 +33,10 @@ Register in `~/.claude.json` (Claude Code) or `claude_desktop_config.json` (Clau
   "mcpServers": {
     "archd": {
       "command": "uv",
-      "args": ["run", "python", "main.py"],
-      "cwd": "/absolute/path/to/server"
+      "args": [
+        "run",
+        "/absolute/path/to/architecture-diagram/server/main.py"
+      ]
     }
   }
 }

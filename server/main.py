@@ -1,3 +1,13 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "mcp[cli]>=1.0.0",
+#   "fastapi>=0.110.0",
+#   "uvicorn[standard]>=0.27.0",
+#   "pydantic>=2.0.0",
+# ]
+# ///
+
 """archd MCP server — exposes diagram tools via Model Context Protocol (stdio)
 and optionally an HTTP REST bridge for browser integration.
 
@@ -16,7 +26,6 @@ Run both at once (HTTP in background thread):
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import threading
 from pathlib import Path
@@ -335,6 +344,7 @@ async def http_delete(rest_path: str, element_id: str):
 
 def _run_http(port: int) -> None:
     """Run uvicorn in its own asyncio event loop (for background thread use)."""
+    import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     config = uvicorn.Config(http_app, host="127.0.0.1", port=port, log_level="warning", loop="none")
@@ -362,9 +372,9 @@ def main() -> None:
         t = threading.Thread(target=_run_http, args=(args.port,), daemon=True)
         t.start()
         print(f"archd HTTP bridge → http://127.0.0.1:{args.port} (background)", flush=True)
-        asyncio.run(mcp.run_async())
+        mcp.run()
     else:
-        asyncio.run(mcp.run_async())
+        mcp.run()
 
 
 if __name__ == "__main__":
