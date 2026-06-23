@@ -5,7 +5,6 @@
 #   "fastapi>=0.110.0",
 #   "uvicorn[standard]>=0.27.0",
 #   "pydantic>=2.0.0",
-#   "cairosvg>=2.7.0",
 # ]
 # ///
 
@@ -335,7 +334,13 @@ def export_diagram(
 
     if format == "png":
         svg_str = model.to_svg()
-        import cairosvg
+        try:
+            import cairosvg
+        except ImportError:
+            raise ValueError(
+                "PNG export requires cairosvg and the Cairo system library.\n"
+                "On macOS: brew install cairo && uv add cairosvg"
+            )
         png_bytes = cairosvg.svg2png(bytestring=svg_str.encode("utf-8"), scale=2)
         if output_path:
             out = output_path if output_path.endswith(".png") else output_path + ".png"
