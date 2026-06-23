@@ -47,7 +47,7 @@ from diagram import DiagramModel, SHAPE_NAME_MAP
 # ---------------------------------------------------------------------------
 
 _diagrams: Dict[str, DiagramModel] = {}
-_work_dir = Path("diagrams")
+_work_dir = Path(__file__).parent / "diagrams"
 
 # Current diagram tracked for the browser bridge
 _current_path: Optional[str] = None
