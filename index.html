@@ -88,6 +88,19 @@
       <button class="toolbar-btn" id="btn-export" title="Export diagram">Export…</button>
     </div>
 
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="btn-layout" title="Auto-layout the diagram (dagre)">Layout ▾</button>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="btn-bridge" title="Connect to the local MCP HTTP bridge">Bridge</button>
+      <span id="bridge-dot" class="bridge-dot" title="Not connected"></span>
+    </div>
+
     <div class="toolbar-group">
       <button class="toolbar-btn icon-btn" id="btn-help" title="Keyboard shortcuts (?)">?</button>
     </div>
@@ -337,8 +350,40 @@
     </div>
   </dialog>
 
+  <!-- Layout direction popover -->
+  <div id="layout-popover" class="popover" hidden>
+    <button data-dir="TB">Top → Bottom</button>
+    <button data-dir="LR">Left → Right</button>
+    <button data-dir="BT">Bottom → Top</button>
+    <button data-dir="RL">Right → Left</button>
+  </div>
+
+  <!-- MCP Bridge dialog -->
+  <dialog id="bridge-dialog">
+    <h3>MCP HTTP Bridge</h3>
+    <p class="dialog-note">
+      Run <code>python server/main.py --http</code> in your terminal, then connect here to
+      auto-reload diagrams written by the MCP server.
+    </p>
+    <div class="dialog-body">
+      <div class="form-row">
+        <label>Bridge URL</label>
+        <input type="text" id="bridge-url" value="http://localhost:7474" autocomplete="off">
+      </div>
+      <div class="form-row" id="bridge-status-row">
+        <span id="bridge-status-text">Not connected</span>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button id="bridge-connect-btn" class="btn-primary">Connect</button>
+      <button id="bridge-disconnect-btn" disabled>Disconnect</button>
+      <button id="bridge-cancel-btn">Close</button>
+    </div>
+  </dialog>
+
   <!-- Vendor -->
   <script src="vendor/joint.js"></script>
+  <script src="vendor/dagre.js"></script>
 
   <!-- App modules (order matters — no ES modules) -->
   <script src="js/model.js"></script>
@@ -353,6 +398,7 @@
   <script src="js/properties.js"></script>
   <script src="js/custom-library.js"></script>
   <script src="js/mermaid-export.js"></script>
+  <script src="js/layout.js"></script>
   <script src="js/app.js"></script>
 
 </body>

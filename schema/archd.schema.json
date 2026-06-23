@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "archd-v1.schema.json",
+  "title": "Architecture Diagram (.archd) envelope — schema v1.0",
+  "description": "File format produced by the architecture-diagram editor. The graph field is a JointJS graph.toJSON() payload.",
+  "type": "object",
+  "required": ["schemaVersion", "document", "graph"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Major.minor version. A reader must reject files where major > its own major."
+    },
+    "document": {
+      "type": "object",
+      "required": ["id", "name", "createdAt"],
+      "additionalProperties": false,
+      "properties": {
+        "id":         { "type": "string", "description": "UUID v4 document identifier" },
+        "name":       { "type": "string", "minLength": 1 },
+        "createdAt":  { "type": "string", "format": "date-time" },
+        "modifiedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "Embedded binary assets referenced by cells (currently unused — images are inlined in cell attrs).",
+      "items": {
+        "type": "object",
+        "required": ["id", "mimeType", "encoding", "data"],
+        "additionalProperties": false,
+        "properties": {
+          "id":       { "type": "string" },
+          "mimeType": { "type": "string" },
+          "encoding": { "type": "string", "enum": ["base64"] },
+          "data":     { "type": "string" }
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "required": ["cells"],
+      "description": "JointJS graph.toJSON() output.",
+      "properties": {
+        "cells": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cell" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "cell": {
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "JointJS cell type — archd.* for app shapes, standard.Link for connectors."
+        },
+        "id": { "type": "string" },
+        "position": {
+          "type": "object",
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "size": {
+          "type": "object",
+          "required": ["width", "height"],
+          "properties": {
+            "width":  { "type": "number", "minimum": 1 },
+            "height": { "type": "number", "minimum": 1 }
+          }
+        },
+        "angle": { "type": "number" },
+        "attrs": {
+          "type": "object",
+          "description": "JointJS selector → SVG attribute map. Keys are selectors; values are attribute objects."
+        },
+        "source": {
+          "type": "object",
+          "description": "Link source (links only).",
+          "properties": {
+            "id":   { "type": "string" },
+            "port": { "type": "string" }
+          }
+        },
+        "target": {
+          "type": "object",
+          "description": "Link target (links only).",
+          "properties": {
+            "id":   { "type": "string" },
+            "port": { "type": "string" }
+          }
+        },
+        "router": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "args": { "type": "object" }
+          }
+        },
+        "connector": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "args": { "type": "object" }
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "ports": { "type": "object" },
+        "z":     { "type": "integer" }
+      }
+    }
+  }
+}

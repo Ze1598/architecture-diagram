@@ -637,3 +637,61 @@ kbd {
   white-space: nowrap;
   line-height: 1.4;
 }
+
+/* ===== Layout popover ===== */
+.popover {
+  position: fixed;
+  z-index: 500;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 160px;
+}
+
+.popover button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.popover button:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+
+/* ===== Bridge indicator ===== */
+.bridge-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  margin-left: 2px;
+  vertical-align: middle;
+  transition: background 0.25s;
+}
+
+.bridge-dot.bridge-dot-on {
+  background: #22c55e;
+  box-shadow: 0 0 4px rgba(34,197,94,0.6);
+}
+
+/* bridge dialog code tag */
+#bridge-dialog code {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 12px;
+}

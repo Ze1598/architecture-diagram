@@ -251,6 +251,109 @@
     img.src = dataUrl;
   }
 
+  // ---- Auto-layout popover ----
+
+  function _initLayout() {
+    const btn     = document.getElementById('btn-layout');
+    const popover = document.getElementById('layout-popover');
+    if (!btn || !popover) return;
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = btn.getBoundingClientRect();
+      popover.style.top  = (r.bottom + 4) + 'px';
+      popover.style.left = r.left + 'px';
+      popover.hidden = !popover.hidden;
+    });
+
+    popover.querySelectorAll('[data-dir]').forEach(b => {
+      b.addEventListener('click', () => {
+        App.Layout.applyDagre(b.dataset.dir);
+        popover.hidden = true;
+      });
+    });
+
+    document.addEventListener('click', () => { popover.hidden = true; });
+  }
+
+  // ---- MCP bridge ----
+
+  const Bridge = (function () {
+    let _url     = null;
+    let _timer   = null;
+    let _lastMod = null;
+
+    function _setStatus(connected, msg) {
+      const dot  = document.getElementById('bridge-dot');
+      const text = document.getElementById('bridge-status-text');
+      const conn = document.getElementById('bridge-connect-btn');
+      const disc = document.getElementById('bridge-disconnect-btn');
+      if (dot)  dot.className  = 'bridge-dot' + (connected ? ' bridge-dot-on' : '');
+      if (text) text.textContent = msg;
+      if (conn) conn.disabled = connected;
+      if (disc) disc.disabled = !connected;
+    }
+
+    function connect(url) {
+      _url = url.replace(/\/$/, '');
+      _setStatus(false, 'Connecting…');
+      _poll();
+    }
+
+    function disconnect() {
+      clearTimeout(_timer);
+      _timer   = null;
+      _url     = null;
+      _lastMod = null;
+      _setStatus(false, 'Disconnected');
+    }
+
+    async function _poll() {
+      if (!_url) return;
+      try {
+        const res = await fetch(_url + '/current', { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const envelope = await res.json();
+        const mod = envelope.document && envelope.document.modifiedAt;
+        if (mod && mod !== _lastMod) {
+          _lastMod = mod;
+          App.History.push();
+          App.Canvas.graph.fromJSON(envelope.graph || {});
+          if (envelope.document) {
+            App.Model.current.document = envelope.document;
+            App.Events.emit('document:loaded', App.Model.current);
+          }
+        }
+        _setStatus(true, 'Connected — watching for changes');
+      } catch (err) {
+        _setStatus(false, 'Error: ' + err.message);
+      }
+      _timer = setTimeout(_poll, 2000);
+    }
+
+    return { connect, disconnect };
+  })();
+
+  function _initBridge() {
+    const btn     = document.getElementById('btn-bridge');
+    const dialog  = document.getElementById('bridge-dialog');
+    const connBtn = document.getElementById('bridge-connect-btn');
+    const discBtn = document.getElementById('bridge-disconnect-btn');
+    const cancelBtn = document.getElementById('bridge-cancel-btn');
+    if (!btn || !dialog) return;
+
+    btn.addEventListener('click', () => dialog.showModal());
+    cancelBtn.addEventListener('click', () => dialog.close());
+
+    connBtn.addEventListener('click', () => {
+      const url = (document.getElementById('bridge-url').value || '').trim();
+      if (!url) return;
+      Bridge.connect(url);
+    });
+
+    discBtn.addEventListener('click', () => Bridge.disconnect());
+  }
+
   // ---- Unsaved changes guard ----
 
   function _initBeforeUnload() {
@@ -305,6 +408,8 @@
     _initKeyboard();
     _initStatusUpdates();
     _initBeforeUnload();
+    _initLayout();
+    _initBridge();
 
     // Clipboard paste — images land as canvas nodes
     _initClipboardPaste();
