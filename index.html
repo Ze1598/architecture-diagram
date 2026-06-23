@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Diagram</title>
+  <link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+
+  <div id="toolbar">
+    <div class="toolbar-group">
+      <div class="dropdown" id="file-menu">
+        <button class="toolbar-btn dropdown-toggle" data-menu="file">File</button>
+        <div class="dropdown-menu">
+          <button data-action="new">New <span class="kbd">Ctrl+N</span></button>
+          <button data-action="open">Open… <span class="kbd">Ctrl+O</span></button>
+          <hr>
+          <button data-action="save">Save <span class="kbd">Ctrl+S</span></button>
+          <button data-action="save-as">Save As… <span class="kbd">Ctrl+Shift+S</span></button>
+          <hr>
+          <div id="recent-files-container">
+            <span class="menu-label">Recent Files</span>
+            <div id="recent-files-list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="dropdown" id="edit-menu">
+        <button class="toolbar-btn dropdown-toggle" data-menu="edit">Edit</button>
+        <div class="dropdown-menu">
+          <button data-action="undo" id="menu-undo">Undo <span class="kbd">Ctrl+Z</span></button>
+          <button data-action="redo" id="menu-redo">Redo <span class="kbd">Ctrl+Y</span></button>
+          <hr>
+          <button data-action="cut">Cut <span class="kbd">Ctrl+X</span></button>
+          <button data-action="copy">Copy <span class="kbd">Ctrl+C</span></button>
+          <button data-action="paste">Paste <span class="kbd">Ctrl+V</span></button>
+          <button data-action="duplicate">Duplicate <span class="kbd">Ctrl+D</span></button>
+          <hr>
+          <button data-action="select-all">Select All <span class="kbd">Ctrl+A</span></button>
+          <button data-action="delete">Delete <span class="kbd">Del</span></button>
+          <hr>
+          <button data-action="bring-forward">Bring Forward</button>
+          <button data-action="send-backward">Send Backward</button>
+          <button data-action="bring-to-front">Bring to Front</button>
+          <button data-action="send-to-back">Send to Back</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <button class="toolbar-btn icon-btn" id="btn-undo" title="Undo (Ctrl+Z)" data-action="undo" disabled>
+        <svg viewBox="0 0 16 16" width="14" height="14"><path d="M4.5 4.5A5.5 5.5 0 1 1 2.7 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><polyline points="1,6 3,9 5,6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="toolbar-btn icon-btn" id="btn-redo" title="Redo (Ctrl+Y)" data-action="redo" disabled>
+        <svg viewBox="0 0 16 16" width="14" height="14"><path d="M11.5 4.5A5.5 5.5 0 1 0 13.3 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><polyline points="15,6 13,9 11,6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group zoom-group">
+      <button class="toolbar-btn icon-btn" id="btn-zoom-out" title="Zoom Out (Ctrl+-)">
+        <svg viewBox="0 0 16 16" width="14" height="14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11.5" y1="11.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <span id="zoom-display" title="Click to reset zoom">100%</span>
+      <button class="toolbar-btn icon-btn" id="btn-zoom-in" title="Zoom In (Ctrl+=)">
+        <svg viewBox="0 0 16 16" width="14" height="14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="4" x2="7" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11.5" y1="11.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-fit" title="Fit to Content (Ctrl+Shift+F)">Fit</button>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="btn-export" title="Export diagram">Export…</button>
+    </div>
+
+    <div class="toolbar-group">
+      <button class="toolbar-btn icon-btn" id="btn-help" title="Keyboard shortcuts (?)">?</button>
+    </div>
+
+    <div id="toolbar-filename">
+      <span id="filename-display">Untitled</span>
+      <span id="dirty-indicator" title="Unsaved changes" hidden>●</span>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="palette">
+      <div id="palette-header">Shapes</div>
+      <ul id="palette-list"></ul>
+    </div>
+    <div id="canvas-wrap">
+      <div id="paper-container"></div>
+    </div>
+
+    <!-- Properties panel (right sidebar) -->
+    <div id="properties-panel">
+      <div id="prop-header">Properties</div>
+
+      <!-- Empty state -->
+      <div id="prop-empty">
+        <span>Select a shape or connector to edit its properties</span>
+      </div>
+
+      <!-- Element properties -->
+      <div id="prop-element" style="display:none">
+
+        <div id="prop-fill-section">
+          <div class="prop-section-title">Fill</div>
+          <div class="prop-row">
+            <label>Color</label>
+            <input type="color" id="prop-fill-color" value="#ffffff">
+            <button id="prop-fill-none" class="prop-icon-btn" title="No fill (transparent)">∅</button>
+          </div>
+        </div>
+
+        <div id="prop-stroke-section">
+          <div class="prop-section-title">Stroke</div>
+          <div class="prop-row">
+            <label>Color</label>
+            <input type="color" id="prop-stroke-color" value="#333333">
+          </div>
+          <div class="prop-row">
+            <label>Width</label>
+            <input type="number" id="prop-stroke-width" min="0" max="20" step="0.5" value="1.5">
+          </div>
+          <div class="prop-row">
+            <label>Style</label>
+            <select id="prop-stroke-style">
+              <option value="">Solid</option>
+              <option value="4 4">Dashed</option>
+              <option value="1 4">Dotted</option>
+              <option value="8 4 2 4">Dash-dot</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="prop-appear-section">
+          <div class="prop-section-title">Appearance</div>
+          <div class="prop-row">
+            <label>Opacity</label>
+            <input type="range" id="prop-opacity" min="0" max="1" step="0.05" value="1">
+            <span id="prop-opacity-val" class="prop-value-label">100%</span>
+          </div>
+          <div class="prop-row" id="prop-radius-row">
+            <label>Radius</label>
+            <input type="number" id="prop-corner-radius" min="0" max="100" step="1" value="0">
+          </div>
+        </div>
+
+        <div id="prop-text-section">
+          <div class="prop-section-title">Text</div>
+          <div class="prop-row">
+            <label>Color</label>
+            <input type="color" id="prop-text-color" value="#333333">
+          </div>
+          <div class="prop-row">
+            <label>Size</label>
+            <input type="number" id="prop-font-size" min="8" max="72" step="1" value="13">
+          </div>
+        </div>
+      </div>
+
+      <!-- Link / connector properties -->
+      <div id="prop-link" style="display:none">
+
+        <div class="prop-section-title">Line</div>
+        <div class="prop-row">
+          <label>Color</label>
+          <input type="color" id="prop-link-color" value="#333333">
+        </div>
+        <div class="prop-row">
+          <label>Width</label>
+          <input type="number" id="prop-link-width" min="0.5" max="10" step="0.5" value="1.5">
+        </div>
+        <div class="prop-row">
+          <label>Style</label>
+          <select id="prop-link-style">
+            <option value="">Solid</option>
+            <option value="4 4">Dashed</option>
+            <option value="1 4">Dotted</option>
+          </select>
+        </div>
+
+        <div class="prop-section-title">Arrows</div>
+        <div class="prop-row">
+          <label>Source</label>
+          <select id="prop-source-arrow">
+            <option value="none">None</option>
+            <option value="arrow">Filled</option>
+            <option value="openArrow">Open</option>
+            <option value="diamond">Diamond</option>
+            <option value="circle">Circle</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <label>Target</label>
+          <select id="prop-target-arrow">
+            <option value="none">None</option>
+            <option value="arrow">Filled</option>
+            <option value="openArrow">Open</option>
+            <option value="diamond">Diamond</option>
+            <option value="circle">Circle</option>
+          </select>
+        </div>
+
+        <div class="prop-section-title">Routing</div>
+        <div class="prop-row">
+          <label>Path</label>
+          <select id="prop-routing">
+            <option value="orthogonal">Orthogonal</option>
+            <option value="straight">Straight</option>
+            <option value="metro">Metro</option>
+          </select>
+        </div>
+
+        <div class="prop-section-title">Label</div>
+        <div class="prop-row">
+          <input type="text" id="prop-link-label" placeholder="Add label…">
+        </div>
+      </div>
+
+      <!-- Mixed selection -->
+      <div id="prop-mixed" style="display:none">
+        <span>Multiple types selected</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <span id="status-zoom">100%</span>
+    <span id="status-selection"></span>
+  </div>
+
+  <!-- Export dialog -->
+  <dialog id="export-dialog">
+    <h3>Export Diagram</h3>
+    <div class="dialog-body">
+      <div class="form-row">
+        <label>Scale</label>
+        <select id="export-scale">
+          <option value="1">1× (original size)</option>
+          <option value="2" selected>2× (recommended)</option>
+          <option value="3">3× (high-res)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label><input type="checkbox" id="export-transparent"> Transparent background (PNG)</label>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button id="export-svg-btn" class="btn-primary">Export SVG</button>
+      <button id="export-png-btn" class="btn-primary">Export PNG</button>
+      <button id="export-cancel-btn">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Generic confirm dialog -->
+  <dialog id="confirm-dialog">
+    <h3 id="confirm-title">Confirm</h3>
+    <p id="confirm-message"></p>
+    <div class="dialog-footer">
+      <button id="confirm-ok-btn" class="btn-primary">OK</button>
+      <button id="confirm-cancel-btn">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Hidden file input for fallback open -->
+  <input type="file" id="file-input" accept=".archd,.json" style="display:none">
+
+  <!-- Keyboard shortcuts dialog -->
+  <dialog id="shortcuts-dialog">
+    <h3>Keyboard Shortcuts</h3>
+    <div class="shortcuts-body">
+      <div class="shortcuts-col">
+        <table class="shortcuts-table">
+          <tr><th colspan="2">File</th></tr>
+          <tr><td><kbd>Ctrl+N</kbd></td><td>New</td></tr>
+          <tr><td><kbd>Ctrl+O</kbd></td><td>Open</td></tr>
+          <tr><td><kbd>Ctrl+S</kbd></td><td>Save</td></tr>
+          <tr><td><kbd>Ctrl+Shift+S</kbd></td><td>Save As</td></tr>
+          <tr><th colspan="2">Edit</th></tr>
+          <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td></tr>
+          <tr><td><kbd>Ctrl+Y</kbd></td><td>Redo</td></tr>
+          <tr><td><kbd>Ctrl+C</kbd></td><td>Copy</td></tr>
+          <tr><td><kbd>Ctrl+X</kbd></td><td>Cut</td></tr>
+          <tr><td><kbd>Ctrl+V</kbd></td><td>Paste</td></tr>
+          <tr><td><kbd>Ctrl+D</kbd></td><td>Duplicate</td></tr>
+          <tr><td><kbd>Del</kbd></td><td>Delete selected</td></tr>
+          <tr><td><kbd>Ctrl+A</kbd></td><td>Select All</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Clear selection</td></tr>
+        </table>
+      </div>
+      <div class="shortcuts-col">
+        <table class="shortcuts-table">
+          <tr><th colspan="2">Canvas</th></tr>
+          <tr><td><kbd>Ctrl+=</kbd></td><td>Zoom in</td></tr>
+          <tr><td><kbd>Ctrl+-</kbd></td><td>Zoom out</td></tr>
+          <tr><td><kbd>Ctrl+0</kbd></td><td>Reset zoom</td></tr>
+          <tr><td><kbd>Ctrl+Shift+F</kbd></td><td>Fit to content</td></tr>
+          <tr><td><kbd>Space+Drag</kbd></td><td>Pan canvas</td></tr>
+          <tr><td><kbd>Middle-drag</kbd></td><td>Pan canvas</td></tr>
+          <tr><th colspan="2">Selection</th></tr>
+          <tr><td><kbd>↑ ↓ ← →</kbd></td><td>Nudge 1px</td></tr>
+          <tr><td><kbd>Shift+Arrow</kbd></td><td>Nudge 10px</td></tr>
+          <tr><td><kbd>Shift+Click</kbd></td><td>Multi-select</td></tr>
+          <tr><td><kbd>Drag on canvas</kbd></td><td>Marquee select</td></tr>
+          <tr><th colspan="2">Shapes &amp; Connectors</th></tr>
+          <tr><td><kbd>Dbl-click</kbd></td><td>Edit label</td></tr>
+          <tr><td><kbd>Hover → drag port</kbd></td><td>Connect shapes</td></tr>
+          <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button id="shortcuts-close-btn" class="btn-primary">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Vendor -->
+  <script src="vendor/joint.js"></script>
+
+  <!-- App modules (order matters — no ES modules) -->
+  <script src="js/model.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/shapes.js"></script>
+  <script src="js/connectors.js"></script>
+  <script src="js/interactions.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/palette.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/properties.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
