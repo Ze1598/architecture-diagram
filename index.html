@@ -43,6 +43,17 @@
           <button data-action="send-backward">Send Backward</button>
           <button data-action="bring-to-front">Bring to Front</button>
           <button data-action="send-to-back">Send to Back</button>
+          <hr>
+          <span class="menu-label">Align</span>
+          <button data-action="align-left">Align Left</button>
+          <button data-action="align-hcenter">Align Center</button>
+          <button data-action="align-right">Align Right</button>
+          <button data-action="align-top">Align Top</button>
+          <button data-action="align-vcenter">Align Middle</button>
+          <button data-action="align-bottom">Align Bottom</button>
+          <span class="menu-label">Distribute</span>
+          <button data-action="distribute-h">Distribute Horizontally</button>
+          <button data-action="distribute-v">Distribute Vertically</button>
         </div>
       </div>
     </div>
@@ -89,9 +100,13 @@
 
   <div id="main">
     <div id="palette">
-      <div id="palette-header">Shapes</div>
-      <ul id="palette-list"></ul>
+      <div id="palette-search-bar">
+        <input type="search" id="palette-search" placeholder="Search shapes…" autocomplete="off">
+      </div>
+      <div id="palette-content"></div>
     </div>
+    <!-- Hidden file input for custom shape upload -->
+    <input type="file" id="palette-upload-input" accept=".svg,.png,.jpg,.jpeg,.webp" multiple style="display:none">
     <div id="canvas-wrap">
       <div id="paper-container"></div>
     </div>
@@ -250,10 +265,12 @@
       <div class="form-row">
         <label><input type="checkbox" id="export-transparent"> Transparent background (PNG)</label>
       </div>
+      <p class="dialog-note">Mermaid export is <strong>lossy</strong>: topology and labels are preserved; exact geometry, rotation, styling, custom icons, and images are not.</p>
     </div>
     <div class="dialog-footer">
       <button id="export-svg-btn" class="btn-primary">Export SVG</button>
       <button id="export-png-btn" class="btn-primary">Export PNG</button>
+      <button id="export-mermaid-btn" class="btn-secondary" title="Lossy — topology only">Export Mermaid</button>
       <button id="export-cancel-btn">Cancel</button>
     </div>
   </dialog>
@@ -334,6 +351,8 @@
   <script src="js/io.js"></script>
   <script src="js/export.js"></script>
   <script src="js/properties.js"></script>
+  <script src="js/custom-library.js"></script>
+  <script src="js/mermaid-export.js"></script>
   <script src="js/app.js"></script>
 
 </body>

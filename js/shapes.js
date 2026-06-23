@@ -209,6 +209,22 @@ App.Shapes = (function () {
     ]
   });
 
+  // Generic image shape — holds pasted images and uploaded custom shapes
+  const ImageShape = joint.dia.Element.define('archd.ImageShape', {
+    attrs: {
+      body: { refWidth: '100%', refHeight: '100%', fill: 'none', stroke: '#d0d0d0', strokeWidth: 1 },
+      image: { refWidth: '100%', refHeight: '100%', preserveAspectRatio: 'xMidYMid meet' },
+      label: { refX: '50%', refY: '108%', textAnchor: 'middle', textVerticalAnchor: 'top', fill: '#555555', fontSize: 11, fontFamily: 'inherit' }
+    },
+    ...JSON.parse(JSON.stringify(PORT_GROUPS))
+  }, {
+    markup: [
+      { tagName: 'rect',  selector: 'body'  },
+      { tagName: 'image', selector: 'image' },
+      { tagName: 'text',  selector: 'label' }
+    ]
+  });
+
   // ---- Namespace for graph.fromJSON reconstruction ----
 
   const namespace = Object.assign({}, joint.shapes);
@@ -223,7 +239,8 @@ App.Shapes = (function () {
     Parallelogram,
     Actor,
     StickyNote,
-    TextLabel
+    TextLabel,
+    ImageShape
   };
 
   // ---- Shape descriptors for palette ----
@@ -297,6 +314,26 @@ App.Shapes = (function () {
     }
   ];
 
+  function createImageShape(dataUrl, position, naturalW, naturalH, labelText) {
+    const MAX = 300;
+    const ratio = (naturalW || 1) / (naturalH || 1);
+    let w = naturalW || 200, h = naturalH || 200;
+    if (w > MAX || h > MAX) {
+      if (w >= h) { w = MAX; h = Math.round(MAX / ratio); }
+      else        { h = MAX; w = Math.round(MAX * ratio); }
+    }
+    const el = new ImageShape();
+    el.resize(w, h);
+    el.position(
+      Math.round((position.x - w / 2) / 10) * 10,
+      Math.round((position.y - h / 2) / 10) * 10
+    );
+    el.attr('image/href', dataUrl);
+    el.attr('label/text', labelText || '');
+    App.Canvas.graph.addCell(el);
+    return el;
+  }
+
   function createShape(type, position, extraAttrs) {
     const descriptor = TYPES.find(t => t.type === type);
     if (!descriptor) throw new Error('Unknown shape type: ' + type);
@@ -328,6 +365,7 @@ App.Shapes = (function () {
   return {
     namespace,
     TYPES,
-    createShape
+    createShape,
+    createImageShape
   };
 })();

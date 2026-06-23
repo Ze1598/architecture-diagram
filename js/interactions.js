@@ -223,6 +223,74 @@ App.Interactions = (function () {
     cells.forEach(c => c.translate(dx, dy));
   }
 
+  // ---- Alignment / distribution ----
+
+  function _alignEls() { return getSelectedCells().filter(c => c.isElement()); }
+
+  function alignLeft() {
+    const els = _alignEls(); if (els.length < 2) return;
+    App.History.push();
+    const minX = Math.min(...els.map(e => e.getBBox().x));
+    els.forEach(e => e.position(minX, e.position().y));
+  }
+
+  function alignRight() {
+    const els = _alignEls(); if (els.length < 2) return;
+    App.History.push();
+    const maxX = Math.max(...els.map(e => { const b = e.getBBox(); return b.x + b.width; }));
+    els.forEach(e => e.position(maxX - e.size().width, e.position().y));
+  }
+
+  function alignHCenter() {
+    const els = _alignEls(); if (els.length < 2) return;
+    App.History.push();
+    const sum = els.reduce((s, e) => s + e.getBBox().x + e.getBBox().width / 2, 0);
+    const cx  = sum / els.length;
+    els.forEach(e => e.position(cx - e.size().width / 2, e.position().y));
+  }
+
+  function alignTop() {
+    const els = _alignEls(); if (els.length < 2) return;
+    App.History.push();
+    const minY = Math.min(...els.map(e => e.getBBox().y));
+    els.forEach(e => e.position(e.position().x, minY));
+  }
+
+  function alignBottom() {
+    const els = _alignEls(); if (els.length < 2) return;
+    App.History.push();
+    const maxY = Math.max(...els.map(e => { const b = e.getBBox(); return b.y + b.height; }));
+    els.forEach(e => e.position(e.position().x, maxY - e.size().height));
+  }
+
+  function alignVCenter() {
+    const els = _alignEls(); if (els.length < 2) return;
+    App.History.push();
+    const sum = els.reduce((s, e) => s + e.getBBox().y + e.getBBox().height / 2, 0);
+    const cy  = sum / els.length;
+    els.forEach(e => e.position(e.position().x, cy - e.size().height / 2));
+  }
+
+  function distributeH() {
+    const els = _alignEls(); if (els.length < 3) return;
+    App.History.push();
+    const sorted = els.slice().sort((a, b) => a.getBBox().x - b.getBBox().x);
+    const first  = sorted[0].getBBox().x;
+    const last   = sorted[sorted.length - 1].getBBox().x;
+    const gap    = (last - first) / (sorted.length - 1);
+    sorted.forEach((e, i) => e.position(first + gap * i, e.position().y));
+  }
+
+  function distributeV() {
+    const els = _alignEls(); if (els.length < 3) return;
+    App.History.push();
+    const sorted = els.slice().sort((a, b) => a.getBBox().y - b.getBBox().y);
+    const first  = sorted[0].getBBox().y;
+    const last   = sorted[sorted.length - 1].getBBox().y;
+    const gap    = (last - first) / (sorted.length - 1);
+    sorted.forEach((e, i) => e.position(e.position().x, first + gap * i));
+  }
+
   // ---- Label editing ----
 
   function _startLabelEdit(elementView, evt) {
@@ -405,6 +473,9 @@ App.Interactions = (function () {
     sendBackward,
     bringToFront,
     sendToBack,
-    nudge
+    nudge,
+    alignLeft, alignRight, alignHCenter,
+    alignTop, alignBottom, alignVCenter,
+    distributeH, distributeV
   };
 })();

@@ -143,6 +143,11 @@ App.Export = (function () {
       exportPNG(scale, transparent);
     });
 
+    document.getElementById('export-mermaid-btn').addEventListener('click', () => {
+      hideDialog();
+      App.MermaidExport.exportToFile();
+    });
+
     document.getElementById('export-cancel-btn').addEventListener('click', hideDialog);
   }
 

@@ -84,6 +84,14 @@
       case 'send-backward': App.Interactions.sendBackward(); break;
       case 'bring-to-front':App.Interactions.bringToFront(); break;
       case 'send-to-back':  App.Interactions.sendToBack(); break;
+      case 'align-left':    App.Interactions.alignLeft();   break;
+      case 'align-right':   App.Interactions.alignRight();  break;
+      case 'align-hcenter': App.Interactions.alignHCenter();break;
+      case 'align-top':     App.Interactions.alignTop();    break;
+      case 'align-bottom':  App.Interactions.alignBottom(); break;
+      case 'align-vcenter': App.Interactions.alignVCenter();break;
+      case 'distribute-h':  App.Interactions.distributeH(); break;
+      case 'distribute-v':  App.Interactions.distributeV(); break;
     }
   }
 
@@ -202,6 +210,47 @@
     if (menuRedo) menuRedo.disabled = !App.History.canRedo();
   }
 
+  // ---- Clipboard image paste ----
+
+  function _initClipboardPaste() {
+    document.addEventListener('paste', (e) => {
+      // Ignore if a text input is focused
+      const focused = document.activeElement;
+      if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
+
+      const items = Array.from(e.clipboardData.items || []);
+      const imgItem = items.find(it => it.type.startsWith('image/'));
+      if (!imgItem) return;
+      e.preventDefault();
+
+      const blob   = imgItem.getAsFile();
+      if (!blob) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => _pasteImageDataUrl(ev.target.result, imgItem.type);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function _pasteImageDataUrl(dataUrl, mimeType) {
+    const MAX = 800;
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      let finalUrl = dataUrl;
+      if (w > MAX || h > MAX) {
+        const r = MAX / Math.max(w, h);
+        w = Math.round(w * r); h = Math.round(h * r);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        finalUrl = canvas.toDataURL(mimeType || 'image/png');
+      }
+      App.History.push();
+      App.Shapes.createImageShape(finalUrl, App.Canvas.getViewportCenter(), w, h, '');
+    };
+    img.src = dataUrl;
+  }
+
   // ---- Unsaved changes guard ----
 
   function _initBeforeUnload() {
@@ -244,6 +293,9 @@
     App.IO.init();
     App.Export.init();
 
+    // Async: custom library loads from IDB and fires library:changed → palette re-renders
+    App.CustomLibrary.init().catch(err => console.warn('Custom library init failed:', err));
+
     // New blank document
     App.Model.newDocument('Untitled');
 
@@ -253,6 +305,9 @@
     _initKeyboard();
     _initStatusUpdates();
     _initBeforeUnload();
+
+    // Clipboard paste — images land as canvas nodes
+    _initClipboardPaste();
 
     // Check for autosave recovery after everything is ready
     setTimeout(() => App.IO.checkAutosaveRecovery(), 300);
