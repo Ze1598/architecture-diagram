@@ -5,6 +5,7 @@
 #   "fastapi>=0.110.0",
 #   "uvicorn[standard]>=0.27.0",
 #   "pydantic>=2.0.0",
+#   "cairosvg>=2.7.0",
 # ]
 # ///
 
@@ -290,19 +291,63 @@ def set_diagram(
 
 
 @mcp.tool()
-def export_diagram(path: str, format: str = "mermaid") -> Dict[str, Any]:
-    """Export the diagram topology as text content.
+def export_diagram(
+    path: str,
+    format: str = "mermaid",
+    output_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Export the diagram in the requested format.
 
-    format='mermaid' — returns Mermaid source string (topology + labels).
-    format='svg'     — returns a basic SVG string (shapes, positions, edges,
-                        labels). Not pixel-perfect but topologically correct.
+    format options:
+      'mermaid' — Mermaid source string (topology + labels).
+      'svg'     — Basic SVG (shapes, positions, edges, labels).
+      'archd'   — Full .archd JSON; round-trip safe for opening on another machine.
+      'png'     — PNG image rendered at 2× scale.
+
+    output_path (optional): write the result to this file and return its path.
+      If omitted, content is returned inline (base64 for PNG, string for others).
+      Recommended for PNG to avoid large base64 payloads in the conversation.
     """
     model = _ensure(path)
+
     if format == "mermaid":
-        return {"format": "mermaid", "content": model.to_mermaid()}
+        content = model.to_mermaid()
+        if output_path:
+            Path(output_path).write_text(content, encoding="utf-8")
+            return {"format": "mermaid", "output_path": str(output_path)}
+        return {"format": "mermaid", "content": content}
+
     if format == "svg":
-        return {"format": "svg", "content": model.to_svg()}
-    raise ValueError("Supported formats: 'mermaid', 'svg'")
+        content = model.to_svg()
+        if output_path:
+            out = output_path if output_path.endswith(".svg") else output_path + ".svg"
+            Path(out).write_text(content, encoding="utf-8")
+            return {"format": "svg", "output_path": out}
+        return {"format": "svg", "content": content}
+
+    if format == "archd":
+        content = json.dumps(model.to_envelope(), indent=2)
+        if output_path:
+            out = output_path if output_path.endswith(".archd") else output_path + ".archd"
+            Path(out).write_text(content, encoding="utf-8")
+            return {"format": "archd", "output_path": out}
+        return {"format": "archd", "content": content}
+
+    if format == "png":
+        svg_str = model.to_svg()
+        import cairosvg
+        png_bytes = cairosvg.svg2png(bytestring=svg_str.encode("utf-8"), scale=2)
+        if output_path:
+            out = output_path if output_path.endswith(".png") else output_path + ".png"
+            Path(out).write_bytes(png_bytes)
+            return {"format": "png", "output_path": out}
+        return {
+            "format": "png",
+            "content_base64": base64.b64encode(png_bytes).decode(),
+            "size_bytes": len(png_bytes),
+        }
+
+    raise ValueError("Supported formats: 'mermaid', 'svg', 'archd', 'png'")
 
 
 @mcp.tool()
