@@ -119,7 +119,7 @@ App.IO = (function () {
 
   async function _autosave() {
     try {
-      const data = App.Model.serialize();
+      const data = _buildSavePayload();
       await _idbPut({ id: 'current', data, savedAt: new Date().toISOString() });
       await _autosaveToDiagramsFolder(data);
     } catch (e) {
@@ -221,6 +221,17 @@ App.IO = (function () {
     });
   }
 
+  // ---- Save payload (archd JSON with embedded SVG snapshot) ----
+
+  function _buildSavePayload() {
+    const data = App.Model.serialize();
+    const svgStr = App.Export ? App.Export.getSVGString() : null;
+    if (!svgStr) return data;
+    const envelope = JSON.parse(data);
+    envelope.exportSvg = svgStr;
+    return JSON.stringify(envelope, null, 2);
+  }
+
   // ---- New file ----
 
   function newFile() {
@@ -302,7 +313,7 @@ App.IO = (function () {
   async function _writeFSA(handle) {
     try {
       const writable = await handle.createWritable();
-      await writable.write(App.Model.serialize());
+      await writable.write(_buildSavePayload());
       await writable.close();
       const file = await handle.getFile();
       _lastExplicitSaveAt = new Date().toISOString();
@@ -316,7 +327,7 @@ App.IO = (function () {
   }
 
   function _downloadFallback() {
-    const data = App.Model.serialize();
+    const data = _buildSavePayload();
     const blob = new Blob([data], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');

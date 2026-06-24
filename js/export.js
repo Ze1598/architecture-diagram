@@ -14,9 +14,13 @@ App.Export = (function () {
 
   // ---- SVG export ----
 
+  function getSVGString() {
+    return _buildSVGString(false);
+  }
+
   function exportSVG() {
     const svgStr = _buildSVGString(false);
-    if (!svgStr) return;
+    if (!svgStr) { alert('Nothing to export — the diagram is empty.'); return; }
     const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
     _triggerDownload(blob, _filename('svg'));
   }
@@ -24,7 +28,7 @@ App.Export = (function () {
   function exportPNG(scale, transparentBg) {
     scale = scale || 2;
     const svgStr = _buildSVGString(transparentBg);
-    if (!svgStr) return;
+    if (!svgStr) { alert('Nothing to export — the diagram is empty.'); return; }
 
     const img = new Image();
     img.onload = () => {
@@ -58,17 +62,11 @@ App.Export = (function () {
     const paper = App.Canvas.paper;
     const graph = App.Canvas.graph;
 
-    if (graph.getCells().length === 0) {
-      alert('Nothing to export — the diagram is empty.');
-      return null;
-    }
+    if (graph.getCells().length === 0) return null;
 
     // Get content bounding box in local (graph) coordinates
     const contentArea = paper.getContentArea({ useModelGeometry: true });
-    if (!contentArea || contentArea.width === 0 || contentArea.height === 0) {
-      alert('Nothing to export — the diagram is empty.');
-      return null;
-    }
+    if (!contentArea || contentArea.width === 0 || contentArea.height === 0) return null;
 
     const pad = EXPORT_PADDING;
     const viewX = contentArea.x - pad;
@@ -162,5 +160,5 @@ App.Export = (function () {
     document.getElementById('export-cancel-btn').addEventListener('click', hideDialog);
   }
 
-  return { init, showDialog, hideDialog, exportSVG, exportPNG };
+  return { init, showDialog, hideDialog, exportSVG, exportPNG, getSVGString };
 })();

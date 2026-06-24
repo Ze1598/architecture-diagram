@@ -150,6 +150,7 @@ class DiagramModel:
         self._doc_id = _uid()
         self._created_at = _now()
         self.cells: List[Dict[str, Any]] = []
+        self._export_svg: Optional[str] = None  # browser-rendered SVG, embedded on save
 
     # ---- Queries ----
 
@@ -161,6 +162,9 @@ class DiagramModel:
 
     def find(self, cell_id: str) -> Optional[Dict]:
         return next((c for c in self.cells if c["id"] == cell_id), None)
+
+    def _invalidate_svg(self) -> None:
+        self._export_svg = None
 
     # ---- Mutations ----
 
@@ -175,6 +179,7 @@ class DiagramModel:
         fill: Optional[str] = None,
         stroke: Optional[str] = None,
     ) -> str:
+        self._invalidate_svg()
         size = _SHAPE_DEFAULTS.get(node_type, {"width": 120, "height": 60})
         w = width  if width  is not None else size["width"]
         h = height if height is not None else size["height"]
@@ -213,6 +218,7 @@ class DiagramModel:
         directed: bool = True,
         dashed: bool = False,
     ) -> str:
+        self._invalidate_svg()
         target_marker: Dict[str, Any] = (
             {"type": "path", "d": "M 10 -5 0 0 10 5 z", "fill": "inherit", "stroke": "none"}
             if directed
@@ -255,6 +261,7 @@ class DiagramModel:
         fill: Optional[str] = None,
         stroke: Optional[str] = None,
     ) -> bool:
+        self._invalidate_svg()
         cell = self.find(node_id)
         if cell is None:
             return False
@@ -275,6 +282,7 @@ class DiagramModel:
         return True
 
     def delete_element(self, element_id: str) -> bool:
+        self._invalidate_svg()
         before = len(self.cells)
         self.cells = [
             c for c in self.cells
@@ -288,6 +296,7 @@ class DiagramModel:
 
     def apply_layout(self, direction: str = "TB", ranksep: int = 80, nodesep: int = 50) -> None:
         """Hierarchical layout via topological sort (no external deps)."""
+        self._invalidate_svg()
         els = self.elements()
         lnks = self.links()
         if not els:
@@ -390,6 +399,7 @@ class DiagramModel:
         model._doc_id = doc.get("id", _uid())
         model._created_at = doc.get("createdAt", _now())
         model.cells = envelope.get("graph", {}).get("cells", [])
+        model._export_svg = envelope.get("exportSvg")
         return model
 
     # ---- Mermaid export ----
@@ -440,7 +450,13 @@ class DiagramModel:
     # ---- SVG export ----
 
     def to_svg(self) -> str:
-        """Return a basic SVG string: correct shapes, positions, labels, edges."""
+        """Return SVG for the diagram.
+
+        Uses the browser-rendered SVG embedded on last save when available.
+        Falls back to a server-generated approximation otherwise.
+        """
+        if self._export_svg:
+            return self._export_svg
         els  = [e for e in self.elements() if e["type"] != "archd.ImageShape"]
         lnks = self.links()
 
