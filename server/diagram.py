@@ -75,6 +75,24 @@ def _esc(text: str) -> str:
                 .replace(">", "&gt;").replace('"', "&quot;"))
 
 
+def _boundary_point(
+    ex: float, ey: float, ew: float, eh: float,
+    toward_x: float, toward_y: float,
+) -> tuple[float, float]:
+    """Return where a ray from the bbox center toward (toward_x, toward_y) exits the bbox."""
+    cx, cy = ex + ew / 2, ey + eh / 2
+    dx, dy = toward_x - cx, toward_y - cy
+    if dx == 0 and dy == 0:
+        return cx, cy
+    ts = []
+    if dx != 0:
+        ts.append(((ex if dx < 0 else ex + ew) - cx) / dx)
+    if dy != 0:
+        ts.append(((ey if dy < 0 else ey + eh) - cy) / dy)
+    t = min((t for t in ts if t >= 0), default=0.0)
+    return cx + t * dx, cy + t * dy
+
+
 def _shape_svg(shape_type: str, x: float, y: float, w: float, h: float,
                fill: str, stroke: str, sw: float) -> str:
     cx, cy = x + w / 2, y + h / 2
@@ -514,10 +532,20 @@ class DiagramModel:
             if not src_el or not tgt_el:
                 continue
 
-            sx = src_el["position"]["x"] + ox + src_el["size"]["width"] / 2
-            sy = src_el["position"]["y"] + oy + src_el["size"]["height"] / 2
-            tx = tgt_el["position"]["x"] + ox + tgt_el["size"]["width"] / 2
-            ty = tgt_el["position"]["y"] + oy + tgt_el["size"]["height"] / 2
+            s_cx = src_el["position"]["x"] + ox + src_el["size"]["width"] / 2
+            s_cy = src_el["position"]["y"] + oy + src_el["size"]["height"] / 2
+            t_cx = tgt_el["position"]["x"] + ox + tgt_el["size"]["width"] / 2
+            t_cy = tgt_el["position"]["y"] + oy + tgt_el["size"]["height"] / 2
+            sx, sy = _boundary_point(
+                src_el["position"]["x"] + ox, src_el["position"]["y"] + oy,
+                src_el["size"]["width"], src_el["size"]["height"],
+                t_cx, t_cy,
+            )
+            tx, ty = _boundary_point(
+                tgt_el["position"]["x"] + ox, tgt_el["position"]["y"] + oy,
+                tgt_el["size"]["width"], tgt_el["size"]["height"],
+                s_cx, s_cy,
+            )
 
             line_a   = lnk.get("attrs", {}).get("line", {})
             s_color  = line_a.get("stroke", "#333333")
